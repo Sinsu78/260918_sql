@@ -1,23 +1,11 @@
 from datetime import datetime, timedelta
-from features import auth
 
 
-def run(supabase):
+def run(supabase, user_info):
     """
     도서 대출 / 반납 메뉴
     """
-
-    # 현재 로그인한 사용자 확인
-    user = auth.current_user
-
-    if user is None:
-        print("\n로그인이 필요합니다.")
-        return
-
-    # 회원만 이용 가능
-    if user["role"] != "member":
-        print("\n회원만 대출 및 반납 기능을 이용할 수 있습니다.")
-        return
+    member_id = user_info["member_id"]
 
     while True:
         print("\n===== 도서 대출 / 반납 =====")
@@ -28,13 +16,13 @@ def run(supabase):
         choice = input("선택: ")
 
         if choice == "1":
-            borrow_book(supabase, user["member_id"])
+            borrow_book(supabase, member_id)
 
         elif choice == "2":
-            return_book(supabase, user["member_id"])
+            return_book(supabase, member_id)
 
         elif choice == "0":
-            print("메인 메뉴로 돌아갑니다.")
+            print("메뉴로 돌아갑니다.")
             break
 
         else:
@@ -88,13 +76,6 @@ def borrow_book(supabase, member_id):
     """
     도서 대출
     최대 3권까지 대출 가능
-
-    대출 가능 조건
-    1. 현재 대출 권수가 3권 미만
-    2. 존재하는 도서
-    3. 현재 대출 중이지 않은 도서
-    4. books.is_available = True
-    5. overdue에 없거나 action = '해결'인 도서
     """
 
     print("\n===== 도서 대출 =====")
@@ -179,10 +160,9 @@ def borrow_book(supabase, member_id):
     # ---------------------------------
     # 7. 손상 도서 여부 확인
     #
-    # overdue에
-    #   - 없음 → 대출 가능
-    #   - action = 해결 → 대출 가능
-    #   - action = 폐기 → 대출 불가
+    # overdue에 없음 → 대출 가능
+    # action = 해결 → 대출 가능
+    # action = 폐기 → 대출 불가
     # ---------------------------------
 
     overdue_response = (
@@ -246,7 +226,7 @@ def borrow_book(supabase, member_id):
     left_book_num = 3 - (current_count + 1)
 
     # ---------------------------------
-    # 11. loans 테이블에 대출 정보 저장
+    # 11. loans 테이블에 INSERT
     # ---------------------------------
 
     loan_response = (
@@ -271,14 +251,16 @@ def borrow_book(supabase, member_id):
     # 12. books 대출 가능 여부 변경
     # ---------------------------------
 
-    supabase \
-        .schema("library") \
-        .table("books") \
+    (
+        supabase
+        .schema("library")
+        .table("books")
         .update({
             "is_available": False
-        }) \
-        .eq("book_id", book_id) \
+        })
+        .eq("book_id", book_id)
         .execute()
+    )
 
     # ---------------------------------
     # 13. 대출 완료
@@ -369,7 +351,7 @@ def return_book(supabase, member_id):
         overdue_status = "정상"
 
     # ---------------------------------
-    # 5. returns 테이블에 반납 정보 저장
+    # 5. returns 테이블에 INSERT
     # ---------------------------------
 
     return_response = (
@@ -394,14 +376,16 @@ def return_book(supabase, member_id):
     # 6. books 대출 가능 여부 변경
     # ---------------------------------
 
-    supabase \
-        .schema("library") \
-        .table("books") \
+    (
+        supabase
+        .schema("library")
+        .table("books")
         .update({
             "is_available": True
-        }) \
-        .eq("book_id", book_id) \
+        })
+        .eq("book_id", book_id)
         .execute()
+    )
 
     # ---------------------------------
     # 7. 반납 완료
